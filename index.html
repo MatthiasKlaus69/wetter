@@ -97,7 +97,15 @@ h2{font-size:.74rem;text-transform:uppercase;letter-spacing:.1em;color:var(--mut
 footer{color:var(--muted);font-size:.72rem;line-height:1.5;margin:4px 4px 0}
 footer a{color:var(--muted)}
 button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.radarTiles{image-rendering:auto;filter:saturate(1.15)}
+.radarTiles{filter:saturate(1.2)}
+/* IR-Bild: Wolken hell, Boden dunkel. Hell: invertiert + multiplizieren = Wolken als graue Schatten. Dunkel: aufhellen */
+.leaflet-clouds-pane{mix-blend-mode:multiply}
+.leaflet-clouds-pane img{filter:invert(1) contrast(1.6) brightness(1.15)}
+@media (prefers-color-scheme: dark){
+  .leaflet-clouds-pane{mix-blend-mode:screen}
+  .leaflet-clouds-pane img{filter:contrast(1.6) brightness(.85)}
+}
+.legendBtn[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
 .leaflet-control-attribution{font-size:9px!important;background:rgba(255,255,255,.7)!important}
 @media (prefers-reduced-motion: reduce){.refresh.spin svg{animation:none}}
 </style>
@@ -132,11 +140,12 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
         <input type="range" id="slider" min="0" max="12" value="6" step="1" aria-label="Radarzeitpunkt">
         <div class="scale"><span>−60 min</span><span>jetzt</span><span>+60 min</span></div>
       </div>
+      <button class="legendBtn" id="cloudBtn" type="button" aria-pressed="true">Wolken</button>
       <button class="legendBtn" id="legendBtn" type="button" aria-expanded="false">Legende</button>
     </div>
     <div class="legend" id="legend" hidden>
       <img alt="Farbskala Niederschlagsintensität (DWD)" id="legendImg">
-      <span>Links von „jetzt“: gemessene Radardaten. Rechts davon: DWD-Kurzfristvorhersage (Nowcast).</span>
+      <span>Farbflächen: Niederschlag laut DWD-Radar. Links von „jetzt“ gemessen, rechts davon DWD-Kurzfristvorhersage. Graue Schleier: Wolken im aktuellen Meteosat-Infrarotbild (EUMETSAT).</span>
     </div>
   </section>
 
@@ -158,7 +167,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
   <p class="err" id="err" hidden></p>
 
   <footer>
-    Radar: Deutscher Wetterdienst (DWD), Geodienst maps.dwd.de. Vorhersage: DWD-Modell ICON-D2/EU über
+    Radar: Deutscher Wetterdienst (DWD), Geodienst maps.dwd.de. Wolken: EUMETSAT, Meteosat. Vorhersage: DWD-Modell ICON-D2/EU über
     <a href="https://open-meteo.com/">Open-Meteo</a>. Karte: Esri, © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>.
     <span id="stamp"></span>
   </footer>
@@ -180,12 +189,31 @@ const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/';
 const shade = dark ? 'World_Dark_Gray' : 'World_Light_Gray';
 L.tileLayer(ESRI + shade + '_Base/MapServer/tile/{z}/{y}/{x}',
   { maxZoom: 12, minZoom: 6, detectRetina: true, attribution: 'Karte: Esri, HERE, Garmin, © OpenStreetMap' }).addTo(map);
+map.createPane('clouds'); map.getPane('clouds').style.zIndex = 300;
+map.createPane('radar'); map.getPane('radar').style.zIndex = 400;
 map.createPane('labels'); map.getPane('labels').style.zIndex = 450; map.getPane('labels').style.pointerEvents = 'none';
 L.tileLayer(ESRI + shade + '_Reference/MapServer/tile/{z}/{y}/{x}',
   { maxZoom: 12, minZoom: 6, detectRetina: true, pane: 'labels' }).addTo(map);
 L.circleMarker([LAT, LON], { radius: 6, color: dark ? '#0d1720' : '#ffffff', weight: 2.5, fillColor: '#e0452c', fillOpacity: 1, pane: 'labels' }).addTo(map);
 
 $('legendImg').src = WMS + '?service=WMS&version=1.3.0&request=GetLegendGraphic&format=image/png&layer=' + encodeURIComponent(LAYER) + '&legend_options=fontAntiAliasing:true;fontName:Arial;fontSize:11;dpi:144';
+
+/* ---------- Wolken: EUMETSAT Meteosat Infrarot 10.8 µm (Tag und Nacht) ---------- */
+let clouds = null, cloudErr = 0, cloudsOn = true;
+function buildClouds(){
+  if (clouds) map.removeLayer(clouds);
+  cloudErr = 0;
+  clouds = L.tileLayer.wms('https://view.eumetsat.int/geoserver/wms', {
+    layers: 'msg_fes:ir108', format: 'image/jpeg', version: '1.3.0', tileSize: 512,
+    pane: 'clouds', opacity: dark ? 0.55 : 0.6, className: 'cloudTiles', _t: Date.now()
+  });
+  clouds.on('tileerror', () => { if (++cloudErr > 6){ map.removeLayer(clouds); $('cloudBtn').hidden = true; } });
+  if (cloudsOn) clouds.addTo(map);
+}
+$('cloudBtn').addEventListener('click', () => {
+  cloudsOn = !cloudsOn; $('cloudBtn').setAttribute('aria-pressed', String(cloudsOn));
+  cloudsOn ? clouds.addTo(map) : map.removeLayer(clouds);
+});
 
 /* ---------- Radar-Frames (−60 … +60 min, alle 10 min) ---------- */
 const STEPS = 13, NOW_IDX = 6, STEP_MIN = 10;
@@ -204,7 +232,7 @@ function buildFrames(){
     const t = new Date(b.getTime() + (i - NOW_IDX) * STEP_MIN * 60e3);
     const layer = L.tileLayer.wms(WMS, {
       layers: LAYER, format: 'image/png', transparent: true, version: '1.3.0',
-      time: t.toISOString().replace('.000', ''), opacity: 0, tileSize: 512, zIndex: 300, className: 'radarTiles'
+      time: t.toISOString().replace('.000', ''), opacity: 0, tileSize: 512, pane: 'radar', className: 'radarTiles'
     });
     layer.on('tileerror', () => { if (++radarErrors > 6) showErr('Das DWD-Radar ist gerade nicht erreichbar. Bitte später erneut versuchen.'); });
     layer.addTo(map);
@@ -308,7 +336,7 @@ async function refreshAll(){
   $('reload').classList.add('spin'); $('err').hidden = true;
   const n = new Date();
   $('date').textContent = n.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
-  const wasPlaying = !!timer; setPlaying(false); buildFrames(); if (wasPlaying) setPlaying(true);
+  const wasPlaying = !!timer; setPlaying(false); buildClouds(); buildFrames(); if (wasPlaying) setPlaying(true);
   try { await loadForecast(); }
   catch(e){ showErr('Die Vorhersage konnte nicht geladen werden. Bitte Internetverbindung prüfen und neu laden.'); }
   $('stamp').textContent = 'Stand ' + fmtT(n) + ' Uhr, aktualisiert sich alle 5 Minuten.';
