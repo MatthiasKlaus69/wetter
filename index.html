@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Regenradar Paderborn</title>
-<meta name="regenradar-version" content="2026-11-05.1">
+<meta name="regenradar-version" content="2026-11-05.3">
 <meta name="description" content="Persönliches Regenradar für Paderborn mit DWD-Radar, Nowcast, Stundenprognose und amtlichen Warnungen.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -17,13 +17,13 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
-/* Aufbau: Kopf · Stündlich · Reliefkarte mit Radar und Zeitleiste · Details · 15-min-Regen */
+/* Aufbau (iPhone, ein Bildschirm): Stundenleiste · Reliefkarte mit Lagezeile und Zeitleiste · Details · darunter 15-min-Regen */
 :root{
   --bg:#F5F7F9; --card:#FFFFFF; --fg:#14283B; --muted:#637587; --act:#0868B8; --btn:#EAF0F4; --line:#E4EAF0;
   --rain:#2C8BE0; --sun:#E9A21C;
   --w1:#F2C200; --w2:#F08A00; --w3:#E0301E; --w4:#9B1D8F; --ok:#2E9E5B;
   --past:#0868B8; --future:#8FB9DE;
-  --nav:#1F5B86; --nav2:#123F60; --navTx:#FFFFFF; --pastT:#A9D6F5; --fcT:#F4B400;
+  --nav:rgba(18,100,133,.92); --nav2:rgba(12,66,90,.95); --navSolid:#0A6184; --navTx:#FFFFFF; --pastT:#FFFFFF; --fcT:#EDAF2D;
   --shadow:0 1px 2px rgba(20,40,59,.05),0 8px 24px rgba(20,40,59,.06);
   --r:16px;
   --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
@@ -42,9 +42,12 @@ button{font:inherit;color:inherit}
 .ico{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .num{font-variant-numeric:tabular-nums}
 
-.app{max-width:1240px;margin:0 auto;display:grid;gap:12px;
-  padding-block:calc(env(safe-area-inset-top,0px) + 12px) calc(env(safe-area-inset-bottom,0px) + 16px);
-  padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.app{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;
+  padding-block:calc(env(safe-area-inset-top,0px) + 1px) calc(env(safe-area-inset-bottom,0px) + 16px);
+  padding-left:max(11px,env(safe-area-inset-left,0px));padding-right:max(11px,env(safe-area-inset-right,0px))}
+.app > * + *{margin-top:12px}
+.app > .radar{margin-top:0}
+.app > .details{margin-top:10px}
 .card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow)}
 
 /* A · Kopf */
@@ -72,14 +75,15 @@ button{font:inherit;color:inherit}
 /* B · Radar – Reliefkarte, Bedienung rechts, Zeitleiste unten auf der Karte */
 .radar{overflow:hidden;position:relative}
 .mapWrap{position:relative}
-#map{height:clamp(400px,64svh,760px);background:#B9BCBF}
+#map{height:max(340px,calc(100svh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - var(--fixedH,206px)));background:#B9BCBF}
 .hsTiles{filter:brightness(.86) contrast(1.12) saturate(0)}
-.mapBtns{position:absolute;top:56px;right:8px;z-index:600;display:flex;flex-direction:column;background:#FFFFFF;color:#1B2A36;border-radius:10px;
-  box-shadow:0 2px 10px rgba(0,0,0,.25);overflow:hidden}
-.mapBtns button{width:46px;height:46px;border:0;background:none;color:inherit;display:grid;place-items:center;cursor:pointer}
-.mapBtns button+button{border-top:1px solid #E3E7EB}
+.mapBtns{position:absolute;top:59px;right:7px;z-index:600;display:flex;flex-direction:column;background:#FFFFFF;color:#26333D;border-radius:16px;
+  box-shadow:0 1px 6px rgba(0,0,0,.22);overflow:hidden}
+.mapBtns button{width:43px;height:70px;border:0;background:none;color:inherit;display:grid;place-items:center;cursor:pointer}
+.mapBtns button+button{border-top:1px solid #E6EAEE}
 .mapBtns button[aria-expanded="true"]{background:#EAF0F4}
-.layerMenu{position:absolute;top:56px;right:62px;z-index:650;background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:6px;width:min(250px,calc(100% - 80px))}
+.mapBtns .ico{width:21px;height:21px;stroke-width:1.6}
+.layerMenu{position:absolute;top:59px;right:58px;z-index:650;background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:6px;width:min(250px,calc(100% - 80px))}
 .layerMenu label{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;cursor:pointer;min-height:44px}
 .layerMenu label:hover{background:var(--btn)}
 .layerMenu input{width:18px;height:18px;accent-color:var(--act)}
@@ -93,8 +97,11 @@ button{font:inherit;color:inherit}
 .rawRadar .leaflet-radar-pane{filter:blur(1.3px) saturate(1.1)}
 .scaleBar span{display:flex;justify-content:space-between;font-size:.7rem;color:var(--muted)}
 .linkBtn{border:0;background:var(--btn);border-radius:8px;min-height:40px;font-size:.82rem;cursor:pointer;color:var(--fg)}
-.mapNote{position:absolute;left:8px;top:8px;z-index:600;background:rgba(255,255,255,.92);color:#33424E;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.18);
-  padding:6px 10px;font-size:.8rem;max-width:calc(100% - 76px)}
+.mapInfo{position:absolute;left:8px;top:8px;z-index:600;display:flex;flex-direction:column;align-items:flex-start;gap:5px;max-width:calc(100% - 76px)}
+.mapNote{background:rgba(255,255,255,.93);color:#22313C;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.18);padding:5px 10px;font-size:.8rem;line-height:1.3}
+.mapNote b{font-size:.95rem}
+.mapNote small{color:#6A7884;font-size:.68rem}
+.mapInfo .warnChip{min-height:32px;padding:5px 10px;font-size:.78rem;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.18);background:color-mix(in srgb,var(--wc) 22%,#fff);color:#22313C}
 .pin{background:none;border:0}
 .leaflet-control-attribution{font-size:9px!important;background:rgba(255,255,255,.65)!important;color:#55626C!important}
 .leaflet-control-attribution a{color:#55626C!important}
@@ -108,33 +115,32 @@ button{font:inherit;color:inherit}
   .hsTiles{filter:brightness(.95) contrast(1.05) saturate(0)}
 }
 
-/* C · Zeitleiste (Overlay) */
-.tl{position:absolute;left:0;right:0;bottom:0;z-index:600;display:flex;flex-direction:column;gap:6px;padding:0 8px 8px;pointer-events:none}
+/* C · Zeitleiste (Overlay) – Maße wie Vorlage */
+.tl{position:absolute;left:0;right:0;bottom:1px;z-index:600;display:flex;flex-direction:column;gap:9px;padding:0 4px;pointer-events:none}
 .tl > *{pointer-events:auto}
-.chips{display:flex;gap:4px;flex-wrap:wrap}
-.chip{height:36px;padding:0 12px;border:0;border-radius:6px;background:var(--nav);color:var(--navTx);font-size:.84rem;cursor:pointer;
-  box-shadow:0 1px 4px rgba(0,0,0,.25)}
-.chip[aria-pressed="true"]{background:var(--nav2);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.55),0 1px 4px rgba(0,0,0,.25);font-weight:650}
-.band{display:flex;align-items:center;gap:10px;background:var(--nav);border-radius:10px;padding:6px;box-shadow:0 2px 10px rgba(0,0,0,.3);color:var(--navTx)}
-.tpill{background:var(--nav2);border-radius:7px;padding:0 9px;height:40px;display:flex;flex-direction:column;justify-content:center;align-items:center;min-width:62px;flex:none}
-.tpill b{font-size:1rem;font-weight:650;line-height:1.1}
-.tpill small{font-size:.62rem;letter-spacing:.04em;text-transform:uppercase;color:var(--fcT);font-weight:700;line-height:1.1}
-.tpill.fc{box-shadow:inset 0 0 0 1.5px var(--fcT)}
-.scrub{flex:1;min-width:0;position:relative;height:44px}
-.track{position:absolute;left:0;right:0;top:19px;height:6px;border-radius:3px;display:flex;overflow:hidden}
+.chips{display:flex;gap:6px}
+.chip{height:30px;padding:0 10px;border:0;border-radius:5px;background:var(--nav);color:var(--navTx);font-size:13px;letter-spacing:.01em;cursor:pointer;white-space:nowrap}
+.chips.tabs .chip{min-width:52px;padding:0 12px}
+.chip[aria-pressed="true"]{background:var(--nav2)}
+.band{position:relative;display:flex;align-items:center;gap:19px;height:38px;background:var(--navSolid);border-radius:5px;padding-left:12px;margin-right:0;color:var(--navTx)}
+.tpill{flex:none;min-width:44px;display:flex;align-items:baseline;gap:5px}
+.tpill b{font-size:17px;font-weight:500;line-height:1;letter-spacing:.01em}
+.tpill small{font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--fcT)}
+.tpill.fc b{color:var(--fcT)}
+.scrub{flex:1;min-width:0;position:relative;height:38px}
+.track{position:absolute;left:0;right:0;top:17px;height:4px;border-radius:2px;display:flex;overflow:hidden}
 .track .p{background:var(--pastT)}
 .track .f{background:var(--fcT)}
-.nowMark{position:absolute;top:13px;width:2px;height:18px;background:#FFFFFF;border-radius:1px;transform:translateX(-1px);opacity:.9}
-.thumb{position:absolute;top:11px;width:22px;height:22px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 4px rgba(0,0,0,.4);transform:translateX(-11px);transition:left .2s ease;pointer-events:none}
-.scrub input{position:absolute;inset:0;width:100%;height:44px;margin:0;opacity:0;cursor:pointer}
-.loading{position:absolute;right:0;top:-2px;width:12px;height:12px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
-.play{width:42px;height:42px;border-radius:50%;border:2px solid #FFFFFF;background:transparent;color:#FFFFFF;display:grid;place-items:center;cursor:pointer;flex:none}
-.play .ico{fill:currentColor;stroke:none;width:18px;height:18px}
+.nowMark{position:absolute;top:12px;width:2px;height:14px;background:#FFFFFF;border-radius:1px;transform:translateX(-1px);opacity:.7}
+.thumb{position:absolute;top:7px;width:25px;height:25px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 3px rgba(0,0,0,.35);transform:translateX(-12.5px);transition:left .2s ease;pointer-events:none}
+.scrub input{position:absolute;inset:-4px 0;width:100%;height:46px;margin:0;opacity:0;cursor:pointer}
+.loading{position:absolute;right:-12px;top:2px;width:10px;height:10px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
+.play{width:39px;height:39px;border-radius:50%;border:1.5px solid rgba(255,255,255,.85);background:#005881;color:#FFFFFF;display:grid;place-items:center;cursor:pointer;flex:none;margin:0 -3px 0 0}
+.play .ico{fill:currentColor;stroke:none;width:15px;height:15px;margin-left:2px}
 
 /* D · Prognose */
 .forecast{display:grid;gap:12px}
-.hoursCard{padding:10px 12px 12px}
-.hoursCard .secHead{margin:0 2px 8px}
+.hoursCard{padding:6px 15px 6px;border-radius:6px 6px 0 0;box-shadow:none}
 .sec{padding:14px 16px}
 .secHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
 h2{font-size:.78rem;font-weight:650;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0}
@@ -143,20 +149,20 @@ h2{font-size:.78rem;font-weight:650;letter-spacing:.04em;text-transform:uppercas
 .dryBox{display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;background:var(--btn)}
 .dryBox b{display:block}
 .dryBox span{color:var(--muted);font-size:.84rem}
-.hours{display:grid;grid-template-columns:repeat(5,minmax(58px,1fr));gap:8px;overflow-x:auto;scrollbar-width:none}
-.hr{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border-radius:12px;background:var(--btn)}
-.hr .t{font-size:.8rem;color:var(--muted)}
-.hr .wx{width:30px;height:30px}
-.hr .tp{font-size:1.15rem;font-weight:600}
-.hr .mm{font-size:.72rem;color:var(--rain);font-weight:600;min-height:1em}
+.hours{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.hr{display:flex;flex-direction:column;align-items:center;gap:0;padding:4px 2px 5px;border-radius:9px;background:#E6EDF1;min-width:0}
+.hr .t{font-size:11px;color:#74859A;line-height:13px;letter-spacing:.01em}
+.hr .wx{width:24px;height:24px;margin:2px 0 1px}
+.hr .tp{font-size:15px;font-weight:700;line-height:18px;color:#1E2C38;white-space:nowrap}
+.hr .mm{font-size:9px;color:var(--rain);font-weight:700;margin-left:2px}
 
-/* E · Details */
-.details{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
-.d{background:var(--card);padding:12px 14px;display:flex;gap:10px;align-items:center;min-width:0}
-.d .ico{color:var(--muted)}
+/* E · Details – zwei Zeilen à 57 pt */
+.details{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:#E9EEF2;border-radius:13px;overflow:hidden;box-shadow:0 1px 3px rgba(20,40,59,.06)}
+.d{background:var(--card);height:57px;padding:0 10px 0 16px;display:flex;gap:13px;align-items:center;min-width:0}
+.d .ico{color:#7C8B98;width:20px;height:20px;stroke-width:1.5}
 .d div{min-width:0}
-.d small{display:block;font-size:.72rem;color:var(--muted)}
-.d b{font-size:1rem;font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d small{display:block;font-size:11px;line-height:14px;color:#7C8B98}
+.d b{font-size:15.5px;line-height:20px;font-weight:700;letter-spacing:-.005em;color:#1E2C38;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dirArrow{display:inline-block;margin-left:4px;transition:transform .3s}
 .detToggle{justify-self:center;border:0;background:none;color:var(--muted);font-size:.8rem;display:flex;align-items:center;gap:4px;min-height:44px;padding:0 12px;cursor:pointer}
 .detToggle .ico{width:16px;height:16px;transition:transform .2s}
@@ -178,7 +184,7 @@ footer{color:var(--muted);font-size:.72rem;line-height:1.5;text-align:center;pad
 
 /* Mobil: Karte randlos */
 @media (max-width: 899px){
-  .radar{margin-left:calc(-1 * max(12px, env(safe-area-inset-left, 0px)));margin-right:calc(-1 * max(12px, env(safe-area-inset-right, 0px)));border-radius:0;box-shadow:none}
+  .radar{margin-left:calc(-1 * max(11px, env(safe-area-inset-left, 0px)));margin-right:calc(-1 * max(11px, env(safe-area-inset-right, 0px)));border-radius:0;box-shadow:none}
 }
 /* Desktop */
 @media (min-width: 900px){
@@ -188,9 +194,10 @@ footer{color:var(--muted);font-size:.72rem;line-height:1.5;text-align:center;pad
   .stamp{display:block}
   .warnChip{grid-column:1/-1}
   #map{height:clamp(440px,62vh,760px)}
+  .hoursCard{padding:8px 15px;border-radius:13px;box-shadow:var(--shadow)}
+  .app > .radar{margin-top:12px}
   .details{grid-template-columns:repeat(4,1fr)}
-  .detToggle{display:none}
-  .details[hidden]{display:grid!important}
+  .band{max-width:none}
   .modal{place-items:center}
 }
 @media (prefers-reduced-motion: reduce){
@@ -201,32 +208,8 @@ footer{color:var(--muted);font-size:.72rem;line-height:1.5;text-align:center;pad
 <body>
 <main class="app">
 
-  <!-- A · Kopfzeile -->
-  <section class="card head" aria-label="Aktuelle Lage">
-    <div class="where">
-      <h1>Paderborn</h1>
-      <span class="num" id="dateLine">–</span>
-    </div>
-    <div class="now">
-      <svg class="ico wx" id="nowIcon" viewBox="0 0 24 24"></svg>
-      <span class="temp num" id="nowTemp">–°</span>
-      <div class="nowTxt">
-        <span class="say" id="say">Lade Daten …</span>
-        <span class="cond" id="cond"></span>
-      </div>
-    </div>
-    <div class="actions">
-      <span class="stamp num" id="stamp"></span>
-      <button class="iconBtn" id="reload" type="button" aria-label="Aktualisieren">
-        <svg class="ico" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
-      </button>
-    </div>
-    <button class="warnChip" id="warnChip" type="button" hidden></button>
-  </section>
-
   <!-- Stündlich -->
-  <section class="card sec hoursCard" aria-label="Stündliche Prognose">
-    <div class="secHead"><h2>Stündlich</h2><span class="src">DWD ICON</span></div>
+  <section class="card hoursCard" aria-label="Stündliche Prognose, DWD ICON">
     <div class="hours" id="hours"></div>
   </section>
 
@@ -234,7 +217,10 @@ footer{color:var(--muted);font-size:.72rem;line-height:1.5;text-align:center;pad
   <section class="card radar" aria-label="Regenradar">
     <div class="mapWrap">
       <div id="map" aria-label="Reliefkarte mit Niederschlagsradar"></div>
-      <div class="mapNote" id="mapNote" hidden></div>
+      <div class="mapInfo">
+        <div class="mapNote num" id="mapNote" hidden></div>
+        <button class="warnChip" id="warnChip" type="button" hidden></button>
+      </div>
       <div class="mapBtns">
         <button type="button" id="zoomIn" aria-label="Hineinzoomen"><svg class="ico" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></svg></button>
         <button type="button" id="zoomOut" aria-label="Herauszoomen"><svg class="ico" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
@@ -267,7 +253,7 @@ footer{color:var(--muted);font-size:.72rem;line-height:1.5;text-align:center;pad
           </div>
           <button class="play" id="play" type="button" aria-label="Animation abspielen"><svg class="ico" viewBox="0 0 24 24" id="playIco"><path d="M8 5v14l11-7z"/></svg></button>
         </div>
-        <div class="chips" role="group" aria-label="Zeitraum">
+        <div class="chips tabs" role="group" aria-label="Zeitraum">
           <button class="chip num" type="button" data-win="past" aria-pressed="false">−2 Std.</button>
           <button class="chip" type="button" data-win="now" aria-pressed="true">aktuell</button>
           <button class="chip num" type="button" data-win="next" aria-pressed="false">+2 Std.</button>
@@ -277,9 +263,6 @@ footer{color:var(--muted);font-size:.72rem;line-height:1.5;text-align:center;pad
   </section>
 
   <!-- E · Details -->
-  <button class="detToggle" id="detToggle" type="button" aria-expanded="true" aria-controls="details">
-    <svg class="ico" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>Details
-  </button>
   <section class="details" id="details" aria-label="Weitere Werte">
     <div class="d"><svg class="ico" viewBox="0 0 24 24"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg><div><small>Wind</small><b class="num" id="dWind">–</b></div></div>
     <div class="d"><svg class="ico" viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><div><small>Böen</small><b class="num" id="dGust">–</b></div></div>
@@ -319,7 +302,8 @@ const API = 'https://api.open-meteo.com/v1/dwd-icon?latitude=' + LAT + '&longitu
 const WINDOWS = { past: [-120, 0], now: [-60, 60], next: [0, 120] };   // Minuten relativ zum jüngsten Radarbild
 let STEPS = 9, NOW_IDX = 4;
 
-const $ = id => document.getElementById(id);
+const NIL = document.createElement('div');
+const $ = id => document.getElementById(id) || NIL;   // entfernte Elemente brechen nichts
 const dark = matchMedia('(prefers-color-scheme: dark)').matches;
 const hhmm = d => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' });
 const isoHM = s => s.slice(11, 16);
@@ -357,7 +341,14 @@ function wxSvg(code, day){
 const wxText = c => c===0?'Klar':c===1?'Überwiegend sonnig':c===2?'Teils bewölkt':c===3?'Bedeckt':c<=48?'Nebel':c<=55?'Nieselregen':c<=57?'Gefrierender Niesel':c<=65?'Regen':c<=67?'Gefrierender Regen':c<=77?'Schneefall':c<=82?'Regenschauer':c<=86?'Schneeschauer':'Gewitter';
 
 /* ================= Karte ================= */
-const map = L.map('map', { zoomControl: false, attributionControl: true, minZoom: 6, maxZoom: 12 }).setView([LAT, LON], 9);
+const map = L.map('map', { zoomControl: false, attributionControl: true, minZoom: 6, maxZoom: 12, zoomSnap: 0.1, zoomDelta: 1 });
+const HOME_Z = 8.2;   // Vorlage: ≈ 1,9 Längengrade auf 390 pt Breite
+function homeView(fly){
+  const off = map.getSize().y * 0.093;                       // Paderborn 9 % oberhalb der Kartenmitte (wie Vorlage)
+  const c = map.unproject(map.project([LAT, LON], HOME_Z).add([0, off]), HOME_Z);
+  fly ? map.flyTo(c, HOME_Z, { duration: .6 }) : map.setView(c, HOME_Z);
+}
+homeView(false);
 map.attributionControl.setPrefix(false);
 const AGS = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
 L.tileLayer(AGS + 'Elevation/' + (dark ? 'World_Hillshade_Dark' : 'World_Hillshade') + '/MapServer/tile/{z}/{y}/{x}',
@@ -365,14 +356,15 @@ L.tileLayer(AGS + 'Elevation/' + (dark ? 'World_Hillshade_Dark' : 'World_Hillsha
 ['clouds:300', 'radar:400', 'labels:450', 'marker:460'].forEach(s => { const [n, z] = s.split(':'); map.createPane(n).style.zIndex = z; });
 map.getPane('labels').style.pointerEvents = 'none';
 L.tileLayer(AGS + 'Canvas/' + (dark ? 'World_Dark_Gray' : 'World_Light_Gray') + '_Reference/MapServer/tile/{z}/{y}/{x}', { detectRetina: true, maxNativeZoom: 16, pane: 'labels' }).addTo(map);
-L.marker([LAT, LON], { pane: 'marker', interactive: false, keyboard: false, icon: L.divIcon({ className: 'pin', iconSize: [30, 44], iconAnchor: [15, 41],
-  html: '<svg width="30" height="44" viewBox="0 0 30 44" aria-hidden="true"><ellipse cx="15" cy="41" rx="6" ry="2.2" fill="#000" opacity=".28"/>' +
-        '<path d="M15 18v22" stroke="#5B6570" stroke-width="2.4" stroke-linecap="round"/>' +
-        '<circle cx="15" cy="11" r="9" fill="#E3262E" stroke="#A3141B" stroke-width="1.2"/><circle cx="12" cy="8" r="2.8" fill="#fff" opacity=".55"/></svg>' }) }).addTo(map);
+L.marker([LAT, LON], { pane: 'marker', interactive: false, keyboard: false, icon: L.divIcon({ className: 'pin', iconSize: [34, 36], iconAnchor: [10, 34],
+  html: '<svg width="34" height="36" viewBox="0 0 34 36" aria-hidden="true"><defs><filter id="pb" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.6"/></filter></defs>' +
+        '<path d="M10 34 L27 26 L29 28 L12 35 Z" fill="#000" opacity=".28" filter="url(#pb)"/>' +
+        '<path d="M10 13v21" stroke="#55606A" stroke-width="2" stroke-linecap="round"/>' +
+        '<circle cx="10" cy="8" r="7.5" fill="#E8202A"/><circle cx="7.6" cy="5.6" r="2.4" fill="#fff" opacity=".6"/></svg>' }) }).addTo(map);
 
 $('zoomIn').onclick = () => map.zoomIn();
 $('zoomOut').onclick = () => map.zoomOut();
-$('center').onclick = () => map.flyTo([LAT, LON], 9, { duration: .6 });
+$('center').onclick = () => homeView(true);
 $('layersBtn').onclick = () => { const m = $('layerMenu'); m.hidden = !m.hidden; $('layersBtn').setAttribute('aria-expanded', String(!m.hidden)); };
 map.on('click', () => { $('layerMenu').hidden = true; $('layersBtn').setAttribute('aria-expanded', 'false'); });
 
@@ -520,12 +512,12 @@ function updateRadarState(){
   const f = frames[cur]; if (!f) return;
   const allBad = frames.filter(x => x.err > 2 && !x.ok).length > STEPS / 2;
   if (!radarOn) setNote('');
-  else if (allBad) setNote('Radardaten des DWD derzeit nicht verfügbar');
-  else if (f.err > 2 && !f.ok) setNote('Für diesen Zeitpunkt liegen keine Radardaten vor');
-  else setNote(mapDryNote);
+  else if (allBad) setNote((mapStatement ? mapStatement + '<br>' : '') + 'Radardaten des DWD derzeit nicht verfügbar');
+  else if (f.err > 2 && !f.ok) setNote((mapStatement ? mapStatement + '<br>' : '') + 'Für diesen Zeitpunkt keine Radardaten');
+  else setNote(mapStatement);
 }
-let mapDryNote = '';
-function setNote(t){ $('mapNote').hidden = !t; $('mapNote').textContent = t; }
+let mapStatement = '';
+function setNote(t){ $('mapNote').hidden = !t; $('mapNote').innerHTML = t; }
 function setPlaying(on){
   clearInterval(timer); timer = null;
   $('playIco').innerHTML = on ? '<path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/>' : '<path d="M8 5v14l11-7z"/>';
@@ -554,7 +546,7 @@ $('legendInfo').onclick = () => openModal('Legende & Daten', `
   <p>Diagramm und Stundenwerte stammen aus dem DWD-Modell ICON (D2 bzw. EU), bereitgestellt über Open-Meteo. Sie sind eine Modellvorhersage, keine Messung.</p>`);
 
 /* ================= Prognose ================= */
-let fcStamp = null, OFFSET = 3600e3;
+let fcStamp = null, OFFSET = 3600e3, nowTemp = '';
 const tms = s => Date.parse(s + ':00Z') - OFFSET;   // lokale Modellzeit -> Millisekunden
 async function loadForecast(){
   const r = await fetch(API, { cache: 'no-store' });
@@ -562,9 +554,7 @@ async function loadForecast(){
   const d = await r.json(); fcStamp = new Date(); OFFSET = (d.utc_offset_seconds || 0) * 1000;
   const c = d.current;
 
-  $('nowIcon').innerHTML = wxSvg(c.weather_code, c.is_day === 1);
-  $('nowTemp').textContent = Math.round(c.temperature_2m) + '°';
-  $('cond').textContent = wxText(c.weather_code);
+  nowTemp = Math.round(c.temperature_2m) + '°';
 
   // 15-Minuten-Niederschlag, nächste 5 h
   const m = d.minutely_15, nowMs = Date.now();
@@ -580,7 +570,7 @@ async function loadForecast(){
   $('hours').innerHTML = h.time.slice(i0, i0 + 5).map((t, k) => { const i = i0 + k, p = h.precipitation[i] ?? 0;
     return `<div class="hr" title="${wxText(h.weather_code[i])}"><span class="t num">${isoHM(t)}</span>
       <svg class="ico wx" viewBox="0 0 24 24" aria-label="${wxText(h.weather_code[i])}">${wxSvg(h.weather_code[i], h.is_day[i] === 1)}</svg>
-      <span class="tp num">${Math.round(h.temperature_2m[i])}°</span><span class="mm num">${p >= 0.1 ? de(p) + ' mm' : ''}</span></div>`; }).join('');
+      <span class="tp num">${Math.round(h.temperature_2m[i])}°${p >= 0.1 ? `<span class="mm">${de(p)}</span>` : ''}</span></div>`; }).join('');
 
   // Details
   const dirs = ['N','NO','O','SO','S','SW','W','NW'], wd = c.wind_direction_10m;
@@ -598,14 +588,12 @@ function renderStatement(vals, times, curP){
   if (wet(vals[0]) || curP >= 0.1){
     const end = vals.findIndex(v => !wet(v));
     s = end < 0 ? `Anhaltender ${level(Math.max(...vals))} Regen` : `Regen endet gegen ${isoHM(times[end])} Uhr${inX(end)}`;
-    mapDryNote = '';
   } else {
     const st = vals.findIndex(wet);
     s = st < 0 ? 'In den nächsten 5 Stunden trocken' : `${level(vals[st])} Regen ab ca. ${isoHM(times[st])} Uhr${inX(st)}`;
     s = s.charAt(0).toUpperCase() + s.slice(1);
-    mapDryNote = st < 0 || st > 3 ? 'Derzeit kein Niederschlag über Paderborn' : '';
   }
-  $('say').innerHTML = s + '<small>laut Modell</small>';
+  mapStatement = `<b>${nowTemp}</b> · ${s} <small>Modell</small>`;
   updateRadarState();
 }
 
@@ -636,7 +624,7 @@ window.warnWetter = { loadWarnings(data){
   const w = list[0], [lab, col] = LV[Math.min(4, w.level)] || LV[1];
   const span = d => new Date(d).toLocaleString('de-DE', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
   chip.hidden = false; chip.style.setProperty('--wc', col);
-  chip.innerHTML = `<span class="dot"></span><span><b>${w.event}</b> · ${span(w.start)} – ${span(w.end)}${list.length > 1 ? ` · +${list.length - 1} weitere` : ''}</span>`;
+  chip.innerHTML = `<span class="dot"></span><span><b>${w.event}</b> bis ${span(w.end)}${list.length > 1 ? ` · +${list.length - 1}` : ''}</span>`;
   $('dWarn').textContent = w.event; $('dWarn').style.color = col;
   chip.onclick = () => openModal('Amtliche Warnungen · Kreis Paderborn', list.map(x => `<p><b style="color:var(--fg)">${x.headline}</b><br>${span(x.start)} – ${span(x.end)}</p><p>${x.description || ''}</p>`).join('') + '<p>Quelle: Deutscher Wetterdienst</p>');
 } };
@@ -651,32 +639,31 @@ function loadWarnings(){
 /* ================= Ablauf ================= */
 function showErr(t){ $('err').hidden = !t; $('err').textContent = t || ''; }
 async function refresh(){
-  $('reload').classList.add('spin');
   const n = new Date();
-  $('dateLine').textContent = n.toLocaleDateString('de-DE', { weekday: innerWidth < 900 ? 'short' : 'long', day: 'numeric', month: 'long' }) + ' · Stand ' + hhmm(n) + ' Uhr';
   const playing = !!timer; setPlaying(false);
   await smoothProbe;
   buildRadar(); buildClouds(); loadWarnings();
   if (playing) setPlaying(true);
   try { await loadForecast(); showErr(''); }
-  catch(e){ showErr('Prognose derzeit nicht verfügbar. Radar und Warnungen werden weiter angezeigt.'); $('say').textContent = 'Prognose nicht verfügbar'; }
-  $('stamp').textContent = 'Stand ' + hhmm(n);
+  catch(e){ showErr('Prognose derzeit nicht verfügbar. Radar und Warnungen werden weiter angezeigt.'); mapStatement = 'Prognose nicht verfügbar'; updateRadarState(); }
+  fitMap();
   $('footer').textContent = `Radar ${hhmm(frames[NOW_IDX].t)} Uhr und Warnungen: Deutscher Wetterdienst · Wolken: EUMETSAT · Prognose: DWD ICON über Open-Meteo${fcStamp ? ', abgerufen ' + hhmm(fcStamp) + ' Uhr' : ''} · Karte: Esri, OpenStreetMap`;
-  $('reload').classList.remove('spin');
 }
-$('reload').onclick = refresh;
 
-// Details ein-/ausblenden (Mobil)
-const detOpen = store.get('details') !== '0';
-$('details').hidden = !detOpen; $('detToggle').setAttribute('aria-expanded', String(detOpen));
-$('detToggle').onclick = () => { const o = $('details').hidden; $('details').hidden = !o; $('detToggle').setAttribute('aria-expanded', String(o)); store.set('details', o ? '1' : '0'); };
-
+// Kartenhöhe: genau der Platz zwischen Stundenleiste und Details (iPhone ohne Scrollen)
+function fitMap(){
+  if (innerWidth >= 900){ document.documentElement.style.removeProperty('--fixedH'); return; }
+  const h = document.querySelector('.hoursCard').offsetHeight + document.getElementById('details').offsetHeight + 10 + 1 + 2;
+  document.documentElement.style.setProperty('--fixedH', h + 'px');
+  map.invalidateSize && map.invalidateSize();
+  if (!fitMap.done){ fitMap.done = true; homeView(false); }
+}
 let last = 0, rz;
-addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (lastRain) renderChart(...lastRain); }, 200); });
+addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { fitMap(); if (lastRain) renderChart(...lastRain); }, 200); });
 let lastRain = null;
-document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - last > 120e3){ last = Date.now(); refresh(); } });
-setInterval(() => { if (!document.hidden){ last = Date.now(); refresh(); } }, 5 * 60e3);
-last = Date.now(); refresh();
+document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - last > 120e3){ fitMap(); last = Date.now(); refresh(); } });
+setInterval(() => { if (!document.hidden){ fitMap(); last = Date.now(); refresh(); } }, 5 * 60e3);
+fitMap(); last = Date.now(); refresh();
 </script>
 </body>
 </html>
