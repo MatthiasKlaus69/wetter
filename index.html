@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Regenradar Paderborn</title>
-<meta name="regenradar-version" content="2026-11-05.5">
+<meta name="regenradar-version" content="2026-11-05.6">
 <meta name="description" content="Persönliches Regenradar für Paderborn mit DWD-Radar, Nowcast, Stundenprognose und amtlichen Warnungen.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -108,6 +108,7 @@ button{font:inherit;color:inherit}
 .leaflet-bottom.leaflet-right{bottom:auto!important;top:0}
 .leaflet-radar-pane .leaflet-layer{transition:opacity .3s ease}
 .leaflet-clouds-pane{mix-blend-mode:multiply}
+.leaflet-clouds-pane{filter:blur(7px)}
 .leaflet-clouds-pane img{filter:invert(1) grayscale(1) contrast(1.8) brightness(1.2)}
 @media (prefers-color-scheme: dark){
   .leaflet-clouds-pane{mix-blend-mode:screen}
@@ -140,7 +141,7 @@ button{font:inherit;color:inherit}
 
 /* D · Prognose */
 .forecast{display:grid;gap:12px}
-.topLine{padding:7px 2px 8px;font-size:15px;line-height:20px;color:var(--fg);white-space:nowrap;overflow:hidden;text-align:center}
+.topLine{padding:19px 2px 8px;font-size:15px;line-height:20px;color:var(--fg);white-space:nowrap;overflow:hidden;text-align:center}
 .topLine b{font-weight:700}
 .hoursCard{padding:6px 15px 6px;border-radius:6px 6px 0 0;box-shadow:none}
 .sec{padding:14px 16px}
