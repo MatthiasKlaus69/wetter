@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Regenradar Paderborn</title>
-<meta name="regenradar-version" content="2026-11-05.3">
+<meta name="regenradar-version" content="2026-11-05.4">
 <meta name="description" content="Persönliches Regenradar für Paderborn mit DWD-Radar, Nowcast, Stundenprognose und amtlichen Warnungen.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -17,7 +17,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
-/* Aufbau (iPhone, ein Bildschirm): Stundenleiste · Reliefkarte mit Lagezeile und Zeitleiste · Details · darunter 15-min-Regen */
+/* Aufbau (iPhone, ein Bildschirm): Lagezeile · Stundenleiste · Reliefkarte mit Zeitleiste bis zum unteren Rand */
 :root{
   --bg:#F5F7F9; --card:#FFFFFF; --fg:#14283B; --muted:#637587; --act:#0868B8; --btn:#EAF0F4; --line:#E4EAF0;
   --rain:#2C8BE0; --sun:#E9A21C;
@@ -47,7 +47,7 @@ button{font:inherit;color:inherit}
   padding-left:max(11px,env(safe-area-inset-left,0px));padding-right:max(11px,env(safe-area-inset-right,0px))}
 .app > * + *{margin-top:12px}
 .app > .radar{margin-top:0}
-.app > .details{margin-top:10px}
+.app > .hoursCard{margin-top:0}
 .card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow)}
 
 /* A · Kopf */
@@ -75,7 +75,7 @@ button{font:inherit;color:inherit}
 /* B · Radar – Reliefkarte, Bedienung rechts, Zeitleiste unten auf der Karte */
 .radar{overflow:hidden;position:relative}
 .mapWrap{position:relative}
-#map{height:max(340px,calc(100svh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - var(--fixedH,206px)));background:#B9BCBF}
+#map{height:max(360px,calc(100svh - env(safe-area-inset-top,0px) - var(--fixedH,120px)));background:#B9BCBF}
 .hsTiles{filter:brightness(.86) contrast(1.12) saturate(0)}
 .mapBtns{position:absolute;top:59px;right:7px;z-index:600;display:flex;flex-direction:column;background:#FFFFFF;color:#26333D;border-radius:16px;
   box-shadow:0 1px 6px rgba(0,0,0,.22);overflow:hidden}
@@ -116,7 +116,7 @@ button{font:inherit;color:inherit}
 }
 
 /* C · Zeitleiste (Overlay) – Maße wie Vorlage */
-.tl{position:absolute;left:0;right:0;bottom:1px;z-index:600;display:flex;flex-direction:column;gap:9px;padding:0 4px;pointer-events:none}
+.tl{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 4px);z-index:600;display:flex;flex-direction:column;gap:9px;padding:0 4px;pointer-events:none}
 .tl > *{pointer-events:auto}
 .chips{display:flex;gap:6px}
 .chip{height:30px;padding:0 10px;border:0;border-radius:5px;background:var(--nav);color:var(--navTx);font-size:13px;letter-spacing:.01em;cursor:pointer;white-space:nowrap}
@@ -140,6 +140,9 @@ button{font:inherit;color:inherit}
 
 /* D · Prognose */
 .forecast{display:grid;gap:12px}
+.topLine{padding:7px 4px 8px;font-size:15px;line-height:20px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topLine b{font-size:18px;font-weight:700;margin-right:2px}
+.topLine small{font-size:11px;color:var(--muted);margin-left:4px}
 .hoursCard{padding:6px 15px 6px;border-radius:6px 6px 0 0;box-shadow:none}
 .sec{padding:14px 16px}
 .secHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
@@ -184,6 +187,8 @@ footer{color:var(--muted);font-size:.72rem;line-height:1.5;text-align:center;pad
 
 /* Mobil: Karte randlos */
 @media (max-width: 899px){
+  .app{padding-bottom:0}
+  footer,.err{margin-bottom:calc(env(safe-area-inset-bottom,0px) + 12px)}
   .radar{margin-left:calc(-1 * max(11px, env(safe-area-inset-left, 0px)));margin-right:calc(-1 * max(11px, env(safe-area-inset-right, 0px)));border-radius:0;box-shadow:none}
 }
 /* Desktop */
@@ -207,6 +212,9 @@ footer{color:var(--muted);font-size:.72rem;line-height:1.5;text-align:center;pad
 </head>
 <body>
 <main class="app">
+
+  <!-- Lagezeile -->
+  <div class="topLine num" id="topLine" aria-live="polite">Lade Daten …</div>
 
   <!-- Stündlich -->
   <section class="card hoursCard" aria-label="Stündliche Prognose, DWD ICON">
@@ -263,19 +271,6 @@ footer{color:var(--muted);font-size:.72rem;line-height:1.5;text-align:center;pad
   </section>
 
   <!-- E · Details -->
-  <section class="details" id="details" aria-label="Weitere Werte">
-    <div class="d"><svg class="ico" viewBox="0 0 24 24"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg><div><small>Wind</small><b class="num" id="dWind">–</b></div></div>
-    <div class="d"><svg class="ico" viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><div><small>Böen</small><b class="num" id="dGust">–</b></div></div>
-    <div class="d"><svg class="ico" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg><div><small>Rel. Luftfeuchte</small><b class="num" id="dHum">–</b></div></div>
-    <div class="d"><svg class="ico" viewBox="0 0 24 24" id="dWarnIco"><path d="M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z"/></svg><div><small>Amtliche Warnlage</small><b id="dWarn">–</b></div></div>
-  </section>
-
-  <!-- D · Niederschlag 15 min -->
-  <section class="card sec" aria-label="Niederschlag der nächsten 5 Stunden">
-    <div class="secHead"><h2>Niederschlag · 5 Stunden</h2><span class="src">mm/15 Min · ICON-D2</span></div>
-    <div class="rainChart" id="rainChart"></div>
-  </section>
-
   <p class="err" id="err" hidden></p>
   <footer id="footer">Radar und Warnungen: Deutscher Wetterdienst · Wolken: EUMETSAT · Prognose: DWD ICON über Open-Meteo · Karte: Esri, OpenStreetMap</footer>
 </main>
@@ -512,9 +507,9 @@ function updateRadarState(){
   const f = frames[cur]; if (!f) return;
   const allBad = frames.filter(x => x.err > 2 && !x.ok).length > STEPS / 2;
   if (!radarOn) setNote('');
-  else if (allBad) setNote((mapStatement ? mapStatement + '<br>' : '') + 'Radardaten des DWD derzeit nicht verfügbar');
-  else if (f.err > 2 && !f.ok) setNote((mapStatement ? mapStatement + '<br>' : '') + 'Für diesen Zeitpunkt keine Radardaten');
-  else setNote(mapStatement);
+  else if (allBad) setNote('Radardaten des DWD derzeit nicht verfügbar');
+  else if (f.err > 2 && !f.ok) setNote('Für diesen Zeitpunkt keine Radardaten');
+  else setNote('');
 }
 let mapStatement = '';
 function setNote(t){ $('mapNote').hidden = !t; $('mapNote').innerHTML = t; }
@@ -593,7 +588,7 @@ function renderStatement(vals, times, curP){
     s = st < 0 ? 'In den nächsten 5 Stunden trocken' : `${level(vals[st])} Regen ab ca. ${isoHM(times[st])} Uhr${inX(st)}`;
     s = s.charAt(0).toUpperCase() + s.slice(1);
   }
-  mapStatement = `<b>${nowTemp}</b> · ${s} <small>Modell</small>`;
+  $('topLine').innerHTML = `<b>${nowTemp}</b> · ${s}<small>Modell</small>`;
   updateRadarState();
 }
 
@@ -645,7 +640,7 @@ async function refresh(){
   buildRadar(); buildClouds(); loadWarnings();
   if (playing) setPlaying(true);
   try { await loadForecast(); showErr(''); }
-  catch(e){ showErr('Prognose derzeit nicht verfügbar. Radar und Warnungen werden weiter angezeigt.'); mapStatement = 'Prognose nicht verfügbar'; updateRadarState(); }
+  catch(e){ showErr(''); $('topLine').textContent = 'Prognose derzeit nicht verfügbar'; }
   fitMap();
   $('footer').textContent = `Radar ${hhmm(frames[NOW_IDX].t)} Uhr und Warnungen: Deutscher Wetterdienst · Wolken: EUMETSAT · Prognose: DWD ICON über Open-Meteo${fcStamp ? ', abgerufen ' + hhmm(fcStamp) + ' Uhr' : ''} · Karte: Esri, OpenStreetMap`;
 }
@@ -653,7 +648,7 @@ async function refresh(){
 // Kartenhöhe: genau der Platz zwischen Stundenleiste und Details (iPhone ohne Scrollen)
 function fitMap(){
   if (innerWidth >= 900){ document.documentElement.style.removeProperty('--fixedH'); return; }
-  const h = document.querySelector('.hoursCard').offsetHeight + document.getElementById('details').offsetHeight + 10 + 1 + 2;
+  const h = document.getElementById('topLine').offsetHeight + document.querySelector('.hoursCard').offsetHeight + 1;
   document.documentElement.style.setProperty('--fixedH', h + 'px');
   map.invalidateSize && map.invalidateSize();
   if (!fitMap.done){ fitMap.done = true; homeView(false); }
