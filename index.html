@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Regenradar Paderborn</title>
-<meta name="regenradar-version" content="2026-11-05.4">
+<meta name="regenradar-version" content="2026-11-05.5">
 <meta name="description" content="Persönliches Regenradar für Paderborn mit DWD-Radar, Nowcast, Stundenprognose und amtlichen Warnungen.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -140,9 +140,8 @@ button{font:inherit;color:inherit}
 
 /* D · Prognose */
 .forecast{display:grid;gap:12px}
-.topLine{padding:7px 4px 8px;font-size:15px;line-height:20px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.topLine b{font-size:18px;font-weight:700;margin-right:2px}
-.topLine small{font-size:11px;color:var(--muted);margin-left:4px}
+.topLine{padding:7px 2px 8px;font-size:15px;line-height:20px;color:var(--fg);white-space:nowrap;overflow:hidden;text-align:center}
+.topLine b{font-weight:700}
 .hoursCard{padding:6px 15px 6px;border-radius:6px 6px 0 0;box-shadow:none}
 .sec{padding:14px 16px}
 .secHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:10px}
@@ -214,7 +213,7 @@ footer{color:var(--muted);font-size:.72rem;line-height:1.5;text-align:center;pad
 <main class="app">
 
   <!-- Lagezeile -->
-  <div class="topLine num" id="topLine" aria-live="polite">Lade Daten …</div>
+  <div class="topLine num" id="topLine" aria-live="polite">Paderborn · lade Daten …</div>
 
   <!-- Stündlich -->
   <section class="card hoursCard" aria-label="Stündliche Prognose, DWD ICON">
@@ -512,6 +511,12 @@ function updateRadarState(){
   else setNote('');
 }
 let mapStatement = '';
+// Lagezeile: immer einzeilig und zentriert, Schrift verkleinert sich bei Bedarf
+function setTopLine(html){
+  const el = $('topLine'); el.innerHTML = html; el.title = el.textContent;
+  let f = 15; el.style.fontSize = f + 'px';
+  while (el.scrollWidth > el.clientWidth && f > 11){ f -= 0.5; el.style.fontSize = f + 'px'; }
+}
 function setNote(t){ $('mapNote').hidden = !t; $('mapNote').innerHTML = t; }
 function setPlaying(on){
   clearInterval(timer); timer = null;
@@ -588,7 +593,7 @@ function renderStatement(vals, times, curP){
     s = st < 0 ? 'In den nächsten 5 Stunden trocken' : `${level(vals[st])} Regen ab ca. ${isoHM(times[st])} Uhr${inX(st)}`;
     s = s.charAt(0).toUpperCase() + s.slice(1);
   }
-  $('topLine').innerHTML = `<b>${nowTemp}</b> · ${s}<small>Modell</small>`;
+  setTopLine(`Paderborn · aktuell <b>${nowTemp}</b> · ${s.replace('Stunden', 'Std.')}`);
   updateRadarState();
 }
 
@@ -640,7 +645,7 @@ async function refresh(){
   buildRadar(); buildClouds(); loadWarnings();
   if (playing) setPlaying(true);
   try { await loadForecast(); showErr(''); }
-  catch(e){ showErr(''); $('topLine').textContent = 'Prognose derzeit nicht verfügbar'; }
+  catch(e){ showErr(''); setTopLine('Paderborn · Prognose derzeit nicht verfügbar'); }
   fitMap();
   $('footer').textContent = `Radar ${hhmm(frames[NOW_IDX].t)} Uhr und Warnungen: Deutscher Wetterdienst · Wolken: EUMETSAT · Prognose: DWD ICON über Open-Meteo${fcStamp ? ', abgerufen ' + hhmm(fcStamp) + ' Uhr' : ''} · Karte: Esri, OpenStreetMap`;
 }
@@ -654,7 +659,7 @@ function fitMap(){
   if (!fitMap.done){ fitMap.done = true; homeView(false); }
 }
 let last = 0, rz;
-addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { fitMap(); if (lastRain) renderChart(...lastRain); }, 200); });
+addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { fitMap(); setTopLine($('topLine').innerHTML); if (lastRain) renderChart(...lastRain); }, 200); });
 let lastRain = null;
 document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - last > 120e3){ fitMap(); last = Date.now(); refresh(); } });
 setInterval(() => { if (!document.hidden){ fitMap(); last = Date.now(); refresh(); } }, 5 * 60e3);
